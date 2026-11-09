@@ -48,6 +48,7 @@ jobs:
 
       - name: Install checksum-verified Steward 0.2.0
         env:
+          GH_TOKEN: ${{ github.token }}
           STEWARD_HOST: ${{ matrix.host }}
           STEWARD_SHA256: ${{ matrix.checksum }}
         run: |
@@ -55,7 +56,15 @@ jobs:
           install_dir="$RUNNER_TEMP/steward-bin"
           mkdir -p "$install_dir"
           archive="$RUNNER_TEMP/cargo-steward.tar.gz"
-          curl --fail --location --retry 2 "https://github.com/0xdoublesharp/cargo-steward/releases/download/v0.2.0/cargo-steward-${STEWARD_HOST}.tar.gz" -o "$archive"
+          for attempt in 1 2 3 4 5 6; do
+            if gh release download v0.2.0 --repo 0xdoublesharp/cargo-steward \
+              --pattern "cargo-steward-${STEWARD_HOST}.tar.gz" --dir "$RUNNER_TEMP" --clobber; then
+              break
+            fi
+            if [ "$attempt" -eq 6 ]; then exit 1; fi
+            sleep "$attempt"
+          done
+          mv "$RUNNER_TEMP/cargo-steward-${STEWARD_HOST}.tar.gz" "$archive"
           echo "$STEWARD_SHA256  $archive" | sha256sum --check
           tar -xzf "$archive" -C "$install_dir"
           echo "$install_dir" >> "$GITHUB_PATH"
